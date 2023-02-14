@@ -3,10 +3,13 @@
 /* !FONTOS: adatbázis elindítása pl.: xampp-ról a .env-s konfigurációkkal */
 // használt: express, mysql, dotenv, hbs, bcryptjs
 const express = require('express'); // applikáció kezeléséhez
+const sessions = require('express-session'); // session management (express library-t használ)
+const cookieParser = require("cookie-parser"); // cookie management
 const mysql = require("mysql"); // kapcsolatfelvételre az adatbázissal
 const dotenv = require('dotenv'); // .env-hez nem publikus konfigok elrejtésére
 //const bcrypt = require("bcryptjs"); // titkosítás jelszóhoz .hash / .compare => 0/1
 const app = express();
+
 // lekérés .env fájlból & kapcsolat az DB-vel
 dotenv.config({ path: './.env' });
 const db = mysql.createConnection({
@@ -33,6 +36,17 @@ const path = require("path"); // ha más könyvtárból lenne futtatva
 const { table } = require('console');
 app.use(express.static(path.join(__dirname, './public'))); // "publikus" mappa használata 
 
+/* cookie parser indítása */
+app.use(cookieParser());
+
+/* BETA SESSION MANAGEMENT */
+app.use(sessions({
+    secret: "randomleszgeneralvademostilyen",
+    saveUninitialized:true,
+    cookie: { maxAge:  1000 * 60 * 60 },
+    resave: false 
+}));
+
 // index href lekérése
 app.get("/", (req, res) => {
     res.render("index")
@@ -53,9 +67,11 @@ app.get("/login", (req, res) => {
     res.render("login")
 });
 
+
 /* POST-hoz, req.body-hez */
 app.use(express.urlencoded({ extended: 'false' }));
 app.use(express.json());
+
 // register form action-je
 app.post("/auth/register", async (req, res) => {
 
@@ -80,15 +96,39 @@ app.post("/auth/register", async (req, res) => {
         }
 });
 
+app.get("/logout", (req, res) => {
+    req.session.destroy()
+    res.redirect("/")
+})
+
+let session;
+
 app.post("/auth/login", (req, res) => {
     const { name, password } = req.body;
+
+    if(req.body.name == "test" && req.body.password == "test") {
+        session = req.session;
+        console.log(req.session);
+
+        return res.render('login', {
+            data: "Sikeres belépés - megy a session"
+        })
+    }
+
+    /* login test miatt ideiglenesen törölve */
 
     db.query(`SELECT * FROM users WHERE name = "${name}" AND password = "${password}"`, (err, result)=>{
         if(err){
             console.log(err)
         } else {
+            session = req.session;
+            session.userid = req.body.name;
+            console.log(req.session);
+
+            res.send("<a href='/logout'>click to logout</a>")
+
             return res.render('login', {
-                data: JSON.stringify(result) //stringként
+                data: "session started" //stringként
             });
         }
     })
